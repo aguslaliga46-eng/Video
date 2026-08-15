@@ -82,12 +82,21 @@
                     document.getElementById('localPlaceholder').classList.add('hidden');
 
                     isStarted = true;
+
+                    // Perbaikan: Ubah status badge saat tombol mulai ditekan
+                    const statusBadge = document.getElementById('statusBadge');
+                    statusBadge.textContent = 'Mencari...';
+                    statusBadge.className = 'px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30';
+
                     document.getElementById('actionBtn').textContent = 'Berhenti (Stop)';
                     document.getElementById('actionBtn').className = 'bg-red-600 px-8 py-3 rounded-2xl font-bold transition';
                     document.getElementById('nextBtn').classList.remove('hidden');
                     
                     findPartner();
-                } catch (err) { alert('Izin kamera gagal.'); }
+                } catch (err) { 
+                    alert('Izin kamera gagal atau ditolak.'); 
+                    console.error(err);
+                }
             } else { stopChat(); }
         }
 
@@ -112,18 +121,27 @@
 
         function listenForMatchInvitation() {
             db.ref('rooms').on('child_added', (snapshot) => {
-                if (snapshot.val().user1 === myUserId || snapshot.val().user2 === myUserId) joinRoom(snapshot.key);
+                const room = snapshot.val();
+                if (room && (room.user1 === myUserId || room.user2 === myUserId)) {
+                    joinRoom(snapshot.key);
+                }
             });
         }
 
         function joinRoom(roomId) {
             currentRoomId = roomId;
             db.ref('waiting_room/' + myUserId).remove();
+            
+            // Perbaikan: Ubah status badge menjadi Terhubung
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.textContent = 'Terhubung';
+            statusBadge.className = 'px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-full border border-emerald-500/30';
+
             document.getElementById('chatInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
             chatListener = db.ref('rooms/' + roomId + '/messages').on('child_added', (snapshot) => {
                 const msg = snapshot.val();
-                appendMessage(msg.sender === myUserId ? 'me' : 'other', msg.text);
+                if (msg) appendMessage(msg.sender === myUserId ? 'me' : 'other', msg.text);
             });
         }
 
@@ -137,17 +155,29 @@
 
         function appendMessage(sender, text) {
             const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<div class="${sender === 'me' ? 'bg-blue-600 self-end' : 'bg-slate-800 self-start'} p-2 rounded-xl text-xs">${text}</div>`;
+            chatBox.innerHTML += `<div class="${sender === 'me' ? 'bg-blue-600 self-end' : 'bg-slate-800 self-start'} p-2 rounded-xl text-xs max-w-[80%] break-words">${text}</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function stopChat() {
             if (localStream) localStream.getTracks().forEach(t => t.stop());
             if (currentRoomId) db.ref('rooms/' + currentRoomId).remove();
+            db.ref('waiting_room/' + myUserId).remove();
             location.reload();
         }
         
-        function nextChat() { stopChat(); toggleStart(); }
+        function nextChat() { 
+            if (currentRoomId) db.ref('rooms/' + currentRoomId).remove();
+            db.ref('waiting_room/' + myUserId).remove();
+            currentRoomId = null;
+            document.getElementById('chatBox').innerHTML = '';
+            
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.textContent = 'Mencari...';
+            statusBadge.className = 'px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30';
+            
+            findPartner(); 
+        }
     </script>
 </body>
 </html>
